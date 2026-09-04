@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чат с игроком — YLWSMP (админ)</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="chat-wrapper">
+    <!-- Шапка -->
+    <div class="chat-header">
+        <div class="chat-header-left">
+            <span class="chat-icon">🛡️</span>
+            <div>
+                <div class="chat-title">Чат с игроком</div>
+                <div class="chat-subtitle">
+                    Заказ #{{ order.id }} · {{ order.nickname }} · {{ order.shards }} ШАРДОВ
+                    <span class="order-status">{{ order.status }}</span>
+                </div>
+            </div>
+        </div>
+        <div>
+            <a href="/admin" class="chat-back" style="margin-right:12px;">← Админка</a>
+            <a href="/" class="chat-back">→ Магазин</a>
+        </div>
+    </div>
+
+    <!-- Окно сообщений -->
+    <div class="chat-messages" id="messages">
+        {% for msg in messages %}
+            <div class="message {{ msg.sender }}">
+                <div class="message-avatar">{{ '👤' if msg.sender == 'player' else ('🛡️' if msg.sender == 'admin' else '🤖') }}</div>
+                <div class="message-bubble">
+                    <div class="message-text">{{ msg.message }}</div>
+                    <div class="message-time">{{ msg.created_at[:16] }}</div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Форма отправки -->
+    <form class="chat-form" id="chatForm">
+        <input type="text" id="messageInput" placeholder="Напишите ответ..." autocomplete="off" required>
+        <button type="submit">Отправить</button>
+    </form>
+</div>
+
+<script>
+    const token = '{{ token }}';
+    const messagesContainer = document.getElementById('messages');
+    const form = document.getElementById('chatForm');
+    const input = document.getElementById('messageInput');
+
+    // Получаем ключ администратора из URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const adminKey = urlParams.get('key') || '';
+
+    let messageCount = {{ messages|length }};
+    let pageVisible = true;
+
+    document.addEventListener('visibilitychange', () => {
+        pageVisible = !document.hidden;
+    });
+
+    // Звук уведомления (для админа – если пришло сообщение от игрока)
+    let audioCtx = null;
+    function playNotificationSound() {
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            gainNode.gain.value = 0.1;
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.2);
+        } catch(e) { /* игнорируем ошибки звука */ }
+    }
+
+    function renderNewMessages(messages) {
+        messages.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `message ${msg.sender}`;
+            div.innerHTML = `
+                <div class="message-avatar">${msg.sender === 'player' ? '👤' : (msg.sender === 'admin' ? '🛡️' : '🤖')}</div>
+                <div class="message-bubble">
+                    <div class="message-text">${escapeHtml(msg.message)}</div>
+                    <div class="message-time">${msg.created_at ? msg.created_at.slice(0, 16) : ''}</div>
+                </div>
+            `;
+            messagesContainer.appendChild(div);
+        });
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Загрузка сообщений (обновление)
+    async function loadMessages() {
+        try {
+            const res = await fetch(`/api/chat/${token}/messages`);
+            const data = await res.json();
+            if (data.ok) {
+                const messages = data.messages;
+                if (messages.length > messageCount) {
+                    const newMessages = messages.slice(messageCount);
+                    renderNewMessages(newMessages);
+                    messageCount = messages.length;
+
+                    // Звук, если страница не активна и появились сообщения от игрока
+                    if (!pageVisible) {
+                        const hasPlayer = newMessages.some(m => m.sender === 'player');
+                        if (hasPlayer) playNotificationSound();
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Ошибка загрузки:', e);
+        }
+    }
+
+    // Отправка сообщения (от админа)
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = input.value.trim();
+        if (!message) return;
+
+        input.disabled = true;
+        try {
+            const res = await fetch(`/api/admin/chat/${token}/send`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Key': adminKey
+                },
+                body: JSON.stringify({ message })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                input.value = '';
+                loadMessages();
+            } else {
+                alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+            }
+        } catch (e) {
+            alert('Ошибка отправки');
+            console.error(e);
+        }
+        input.disabled = false;
+        input.focus();
+    });
+
+    // Сообщения уже отрендерены сервером — просто скроллим вниз и подхватываем
+    // всё, что пришло уже после рендера страницы.
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    loadMessages();
+
+    // Polling
+    setInterval(loadMessages, 2000);
+</script>
+
+<style>
+    /* (стили те же, что в chat.html) */
+    .chat-wrapper { max-width: 700px; margin: 30px auto; background: white; border: 2px solid #201f1a; border-radius: 14px; box-shadow: 6px 6px 0 rgba(32,31,26,0.9); overflow: hidden; display: flex; flex-direction: column; height: 90vh; max-height: 700px; }
+    .chat-header { background: #faf8f0; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f5c400; flex-wrap: wrap; }
+    .chat-header-left { display: flex; align-items: center; gap: 12px; }
+    .chat-icon { font-size: 28px; }
+    .chat-title { font-family: 'MinecraftRus', Arial, sans-serif; font-size: 20px; color: #222; }
+    .chat-subtitle { font-size: 13px; color: var(--muted); }
+    .order-status { display: inline-block; background: #f7e8a4; padding: 2px 10px; border-radius: 12px; font-size: 11px; margin-left: 8px; color: #333; }
+    .chat-back { color: var(--yellow-dark); text-decoration: none; font-weight: 700; font-size: 14px; }
+    .chat-back:hover { text-decoration: underline; }
+    .chat-messages { flex: 1; padding: 20px 24px; overflow-y: auto; background: #fcfcf9; display: flex; flex-direction: column; gap: 12px; }
+    .chat-messages::-webkit-scrollbar { width: 6px; }
+    .chat-messages::-webkit-scrollbar-track { background: #f0f0ea; }
+    .chat-messages::-webkit-scrollbar-thumb { background: #d5c8b0; border-radius: 4px; }
+    .message { display: flex; align-items: flex-start; gap: 10px; animation: slideUp 0.3s ease-out; max-width: 80%; }
+    .message.player { align-self: flex-end; flex-direction: row-reverse; }
+    .message.admin { align-self: flex-start; }
+    .message.system { align-self: center; max-width: 90%; }
+    .message.system .message-bubble { background: #eee; border-color: #ddd; color: #555; font-style: italic; }
+    .message-avatar { font-size: 28px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+    .message-bubble { background: white; padding: 10px 16px; border-radius: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #eee8d9; word-break: break-word; max-width: 100%; }
+    .message.player .message-bubble { background: #f5c400; border-color: #e0b000; color: #222; }
+    .message.admin .message-bubble { background: white; border-color: #e4dece; }
+    .message-text { font-size: 14px; line-height: 1.5; font-family: Arial, sans-serif; }
+    .message-time { font-size: 10px; opacity: 0.5; margin-top: 4px; text-align: right; }
+    .chat-form { padding: 16px 24px; background: white; border-top: 1px solid #eee8d9; display: flex; gap: 12px; }
+    .chat-form input { flex: 1; padding: 12px 16px; border: 1px solid #e4dece; border-radius: 13px; font-size: 14px; outline: none; transition: 0.2s; font-family: Arial, sans-serif; }
+    .chat-form input:focus { border-color: #f5c400; box-shadow: 0 0 0 4px rgba(245,196,0,0.13); }
+    .chat-form button { padding: 12px 24px; background: #f5c400; border: 2px solid #201f1a; border-radius: 10px; font-weight: 700; cursor: pointer; transition: 0.08s; font-size: 14px; font-family: Arial, sans-serif; color: #222; box-shadow: 3px 3px 0 rgba(32,31,26,0.85); }
+    .chat-form button:hover { background: #ffd21a; }
+    .chat-form button:active { transform: translate(3px, 3px); box-shadow: none; }
+    @keyframes slideUp { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 500px) {
+        .chat-wrapper { margin: 10px; height: 95vh; max-height: none; border-radius: 16px; }
+        .chat-header { flex-wrap: wrap; gap: 8px; }
+        .chat-header-left { width: 100%; }
+        .chat-back { margin-left: auto; }
+        .chat-messages { padding: 12px 16px; }
+        .message { max-width: 92%; }
+        .chat-form { padding: 12px 16px; flex-wrap: wrap; }
+        .chat-form input { flex: 1 1 100%; }
+        .chat-form button { width: 100%; }
+    }
+</style>
+
+</body>
+</html>

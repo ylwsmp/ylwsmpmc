@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YLWSMP — Магазин</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+    {% include "_nav.html" %}
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="brand">
+            <img src="/static/icon.png" alt="YLWSMP" class="server-icon">
+            <div class="logo">YLWSMP</div>
+        </div>
+        <div class="subtitle">Официальный магазин сервера</div>
+    </div>
+
+    <!-- SHOP CARD -->
+    <div class="card">
+        <div class="shard-info">
+            <div class="shard-star">★</div>
+            <div>
+                <div class="shard-title">ШАРДЫ</div>
+                <div class="shard-price">1 ШАРД = 1,50 ₽</div>
+            </div>
+        </div>
+
+        <form method="POST">
+            <label>Никнейм Minecraft</label>
+            <input type="text" name="nickname" placeholder="Введите свой ник" maxlength="16" autocomplete="off" required>
+
+            <label class="minecraft-label">Кол-во ШАРДОВ</label>
+            <div class="packs">
+                <button type="button" class="pack" onclick="setShards(10)">
+                    <b>10 ШАРДОВ</b>
+                    <span>15 ₽</span>
+                </button>
+                <button type="button" class="pack" onclick="setShards(50)">
+                    <b>50 ШАРДОВ</b>
+                    <span>75 ₽</span>
+                </button>
+                <button type="button" class="pack" onclick="setShards(100)">
+                    <b>100 ШАРДОВ</b>
+                    <span>150 ₽</span>
+                </button>
+                <button type="button" class="pack" onclick="setShards(500)">
+                    <b>500 ШАРДОВ</b>
+                    <span>750 ₽</span>
+                </button>
+            </div>
+
+            <label>Своё количество</label>
+            <input id="shards" type="number" name="shards" value="100" min="1" max="100000" oninput="calculate()" required>
+
+            <div class="total">
+                <span class="total-title">К оплате</span>
+                <span class="total-price" id="price">150.00 ₽</span>
+            </div>
+
+            <button type="submit" class="submit">Продолжить →</button>
+            <div class="legal">После создания заказа вы попадёте в чат с администрацией.</div>
+        </form>
+    </div>
+
+    <footer>
+        YLWSMP © 2026 · <span class="footer-brand">ShardShop</span>
+    </footer>
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>
