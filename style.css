@@ -1,0 +1,10 @@
+import {Router} from 'express';
+import axios from 'axios';
+const router=Router();
+router.post('/', async (req,res)=>{
+ try{
+  await axios.post(process.env.DISCORD_WEBHOOK_URL,{content:JSON.stringify(req.body)});
+  res.json({ok:true});
+ }catch(e){res.status(500).json({ok:false});}
+});
+export default router;

@@ -1,0 +1,15 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import orders from './routes/orders.js';
+import discord from './routes/discord.js';
+import rcon from './routes/rcon.js';
+
+dotenv.config();
+const app=express();
+app.use(cors());
+app.use(express.json());
+app.use('/api/orders', orders);
+app.use('/api/discord', discord);
+app.use('/api/rcon', rcon);
+app.listen(process.env.PORT || 3000);
